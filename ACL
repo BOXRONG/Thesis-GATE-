@@ -1,0 +1,168 @@
+ACL
+rule StudentReadOwnThesis {
+description: "學生可以讀取自己的論文"
+participant(p): "edu.thesis.review.Student"
+operation: READ
+resource(r): "edu.thesis.review.Thesis"
+condition: (r.student.getIdentifier() === p.getIdentifier())
+action: ALLOW
+}
+
+rule StudentCanUpdateThesisWork {
+description: "學生可以提交 UpdateThesisWork 交易"
+participant: "edu.thesis.review.Student"
+operation: CREATE
+resource: "edu.thesis.review.UpdateThesisWork"
+action: ALLOW
+}
+
+rule StudentCanSubmitToGate {
+description: "學生可以提交 SubmitToGate 交易"
+participant: "edu.thesis.review.Student"
+operation: CREATE
+resource: "edu.thesis.review.SubmitToGate"
+action: ALLOW
+}
+
+rule StudentCanUpdateThesisAsset {
+description: "學生可以更新自己的論文資產"
+participant(p): "edu.thesis.review.Student"
+operation: UPDATE
+resource(r): "edu.thesis.review.Thesis"
+condition: (r.student.getIdentifier() === p.getIdentifier())
+action: ALLOW
+}
+
+rule CheckerCanReviewGate {
+description: "Checker 可以提交 ReviewGate 交易"
+participant: "edu.thesis.review.Checker"
+operation: CREATE
+resource: "edu.thesis.review.ReviewGate"
+action: ALLOW
+}
+
+rule CheckerCanReadThesis {
+description: "Checker 可以讀取論文資產"
+participant: "edu.thesis.review.Checker"
+operation: READ
+resource: "edu.thesis.review.Thesis"
+action: ALLOW
+}
+
+rule CheckerCanUpdateThesisAsset {
+description: "Checker 可以更新論文資產"
+participant: "edu.thesis.review.Checker"
+operation: UPDATE
+resource: "edu.thesis.review.Thesis"
+action: ALLOW
+}
+
+rule ProfessorCanReviewGate {
+description: "Professor 可以提交 ReviewGate 交易"
+participant: "edu.thesis.review.Professor"
+operation: CREATE
+resource: "edu.thesis.review.ReviewGate"
+action: ALLOW
+}
+
+rule ProfessorCanReadThesis {
+description: "Professor 可以讀取論文資產"
+participant: "edu.thesis.review.Professor"
+operation: READ
+resource: "edu.thesis.review.Thesis"
+action: ALLOW
+}
+
+rule ProfessorCanUpdateThesisAsset {
+description: "Professor 可以更新論文資產"
+participant: "edu.thesis.review.Professor"
+operation: UPDATE
+resource: "edu.thesis.review.Thesis"
+action: ALLOW
+}
+
+rule DirectorCanReviewGate {
+description: "Director 可以提交 ReviewGate 交易"
+participant: "edu.thesis.review.Director"
+operation: CREATE
+resource: "edu.thesis.review.ReviewGate"
+action: ALLOW
+}
+
+rule DirectorCanAdvanceThesis {
+description: "Director 可以提交 AdvanceThesis 強制推進"
+participant: "edu.thesis.review.Director"
+operation: CREATE
+resource: "edu.thesis.review.AdvanceThesis"
+action: ALLOW
+}
+
+rule DirectorCanReadAllThesis {
+description: "Director 可以讀取所有論文資產"
+participant: "edu.thesis.review.Director"
+operation: READ
+resource: "edu.thesis.review.Thesis"
+action: ALLOW
+}
+
+rule DirectorCanUpdateThesisAsset {
+description: "Director 可以更新論文資產"
+participant: "edu.thesis.review.Director"
+operation: UPDATE
+resource: "edu.thesis.review.Thesis"
+action: ALLOW
+}
+
+rule AllCanReadParticipants {
+description: "所有參與者可以讀取參與者資料"
+participant: "edu.thesis.review.*"
+operation: READ
+resource: "edu.thesis.review.*"
+action: ALLOW
+}
+
+// ──新增：系統資源讀取權限（切換身份必要） ──
+
+rule AllParticipantsCanReadSystem {
+description: "所有參與者可以讀取 Composer 系統資源"
+participant: "edu.thesis.review.*"
+operation: READ
+resource: "org.hyperledger.composer.system.**"
+action: ALLOW
+}
+
+rule AllParticipantsCanWriteHistorian {
+description: "所有參與者可以寫入交易歷史紀錄"
+participant: "edu.thesis.review.*"
+operation: CREATE
+resource: "org.hyperledger.composer.system.HistorianRecord"
+action: ALLOW
+}
+
+// ──系統管理員 ──
+
+rule NetworkAdminUser {
+description: "網路管理員擁有所有權限"
+participant: "org.hyperledger.composer.system.NetworkAdmin"
+operation: ALL
+resource: "**"
+action: ALLOW
+}
+
+rule NetworkAdminSystem {
+description: "系統管理員可操作系統資源"
+participant: "org.hyperledger.composer.system.NetworkAdmin"
+operation: ALL
+resource: "org.hyperledger.composer.system.**"
+action: ALLOW
+}
+
+// ──最後：拒絕其餘所有操作 ──
+
+rule DenyAll {
+description: "拒絕所有未明確授權的操作"
+participant: "ANY"
+operation: ALL
+resource: "**"
+action: DENY
+}
