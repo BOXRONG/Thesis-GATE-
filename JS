@@ -1,0 +1,263 @@
+JS
+use strict';
+
+/**
+ * 學生更新當前 Stage 的論文進度報告
+ * @param {edu.thesis.review.UpdateThesisWork} tx
+ * @transaction
+ */
+async function updateThesisWork(tx) {
+const thesis = tx.thesis;
+const participant = getCurrentParticipant();
+
+// === 身份驗證 ===
+if (!participant) {
+throw new Error('找不到當前參與者，請確認已使用有效身份登入。');
+   }
+if (participant.getFullyQualifiedType() !== 'edu.thesis.review.Student') {
+throw new Error('只有 Student 可以提交 UpdateThesisWork 交易。');
+   }
+
+// === 狀態驗證 ===
+if (thesis.isCompleted) {
+throw new Error('論文已完成全流程，無法再更新。');
+   }
+if (thesis.isGatePhase) {
+throw new Error('論文目前處於 Gate 審查階段，無法更新 Stage 報告。請等待審查結果。');
+   }
+
+// === 寫入報告 ===
+const stageIdx = thesis.currentStage - 1;
+thesis.stageReports[stageIdx] = tx.report;
+
+const thesisRegistry = await getAssetRegistry('edu.thesis.review.Thesis');
+await thesisRegistry.update(thesis);
+
+// === 發出事件 ===
+const factory = getFactory();
+const event = factory.newEvent('edu.thesis.review', 'StageUpdated');
+event.thesisId = thesis.thesisId;
+event.stage = thesis.currentStage;
+event.updatedBy = participant.studentId;
+emit(event);
+}
+
+/**
+ * 學生完成 Stage 工作後送出至 Gate 審查
+ * Stage N 完成 → Gate N 審查 (N = 1~5)
+ * Stage 6 完成 → 直接完成論文
+ * @param {edu.thesis.review.SubmitToGate} tx
+ * @transaction
+ */
+async function submitToGate(tx) {
+const thesis = tx.thesis;
+const participant = getCurrentParticipant();
+
+// === 身份驗證 ===
+if (!participant) {
+throw new Error('找不到當前參與者。');
+   }
+if (participant.getFullyQualifiedType() !== 'edu.thesis.review.Student') {
+throw new Error('只有 Student 可以提交 SubmitToGate 交易。');
+   }
+
+// === 狀態驗證 ===
+if (thesis.isCompleted) {
+throw new Error('論文已完成全流程。');
+   }
+if (thesis.isGatePhase) {
+throw new Error('論文已在 Gate 審查中，無法重複送審。');
+   }
+
+// === 確認當前 Stage 報告已填寫 ===
+const stageIdx = thesis.currentStage - 1;
+if (!thesis.stageReports[stageIdx] || thesis.stageReports[stageIdx].trim() === '') {
+throw new Error(
+`Stage ${thesis.currentStage} 的進度報告尚未填寫，` +
+`請先執行 UpdateThesisWork 再送審。`
+);
+   }
+
+const factory = getFactory();
+
+if (thesis.currentStage === 6) {
+// Stage 6 完成 → 論文正式完成
+thesis.isCompleted = true;
+
+const thesisRegistry = await getAssetRegistry('edu.thesis.review.Thesis');
+await thesisRegistry.update(thesis);
+
+const event = factory.newEvent('edu.thesis.review', 'ThesisCompleted');
+event.thesisId = thesis.thesisId;
+emit(event);
+
+   } else {
+// Stage N 完成 → 進入 Gate N 審查
+thesis.isGatePhase = true;
+thesis.currentGate = thesis.currentStage;
+// currentStage 不變，等 Gate 通過後才推進
+
+const thesisRegistry = await getAssetRegistry('edu.thesis.review.Thesis');
+await thesisRegistry.update(thesis);
+
+const event = factory.newEvent('edu.thesis.review', 'ThesisAdvanced');
+event.thesisId = thesis.thesisId;
+       event.newStage = thesis.currentStage;
+event.isGatePhase = true;
+emit(event);
+   }
+}
+
+/**
+ * 審查者對當前 Gate 進行審查
+ * Gate 1 → Checker；Gate 2、4 → Professor；Gate 3、5 → Director
+ * @param {edu.thesis.review.ReviewGate} tx
+ * @transaction
+ */
+async function reviewGate(tx) {
+const thesis = tx.thesis;
+const participant = getCurrentParticipant();
+
+// === 身份驗證 ===
+if (!participant) {
+throw new Error('找不到當前參與者。');
+   }
+
+   const pType = participant.getFullyQualifiedType();
+const allowedTypes = {
+1: 'edu.thesis.review.Checker',
+2: 'edu.thesis.review.Professor',
+3: 'edu.thesis.review.Director',
+4: 'edu.thesis.review.Professor',
+5: 'edu.thesis.review.Director',
+};
+
+// === 狀態驗證 ===
+if (thesis.isCompleted) {
+throw new Error('論文已完成，無需審查。');
+   }
+if (!thesis.isGatePhase) {
+throw new Error('論文目前不在 Gate 審查階段。');
+   }
+
+// === 權責驗證：必須是當前 Gate 對應的角色 ===
+const requiredType = allowedTypes[thesis.currentGate];
+if (pType !== requiredType) {
+const gateNames = {
+1: '抄襲/格式審查（需 Checker 身份）',
+2: '教授口試核准（需 Professor 身份）',
+3: '行政排程核准（需 Director 身份）',
+   4: '口試委員決議（需 Professor 身份）',
+5: '最終核可（需 Director 身份）',
+};
+throw new Error(
+`Gate ${thesis.currentGate}（${gateNames[thesis.currentGate]}）` +
+`無法由 ${pType.split('.').pop()} 審查，權限不符。`
+);
+   }
+
+   // === 寫入審查意見 ===
+const gateIdx = thesis.currentGate - 1;
+thesis.gateComments[gateIdx] = tx.comments;
+thesis.gateApprovals[gateIdx] = tx.approved;
+
+const factory = getFactory();
+
+// 取得審查者 ID（依型別取對應欄位）
+let reviewerId = '';
+if (pType === 'edu.thesis.review.Checker')  reviewerId = participant.checkerId;
+if (pType === 'edu.thesis.review.Professor') reviewerId = participant.professorId;
+if (pType === 'edu.thesis.review.Director') reviewerId = participant.directorId;
+
+if (tx.approved) {
+// 通過 → 推進到下一 Stage
+thesis.isGatePhase = false;
+thesis.currentStage = thesis.currentGate + 1;
+thesis.currentGate = 0;
+
+const thesisRegistry = await getAssetRegistry('edu.thesis.review.Thesis');
+await thesisRegistry.update(thesis);
+
+// 廣播 GateReviewed
+const evReview = factory.newEvent('edu.thesis.review', 'GateReviewed');
+evReview.thesisId  = thesis.thesisId;
+evReview.gate      = gateIdx + 1;
+evReview.approved  = true;
+evReview.reviewedBy = reviewerId;
+emit(evReview);
+
+// 廣播 ThesisAdvanced
+const evAdv = factory.newEvent('edu.thesis.review', 'ThesisAdvanced');
+evAdv.thesisId   = thesis.thesisId;
+evAdv.newStage   = thesis.currentStage;
+evAdv.isGatePhase = false;
+emit(evAdv);
+
+   } else {
+// 不通過 → 停留在當前 Gate，等待重審
+const thesisRegistry = await getAssetRegistry('edu.thesis.review.Thesis');
+await thesisRegistry.update(thesis);
+
+const evReview = factory.newEvent('edu.thesis.review', 'GateReviewed');
+evReview.thesisId  = thesis.thesisId;
+evReview.gate      = gateIdx + 1;
+evReview.approved  = false;
+evReview.reviewedBy = reviewerId;
+emit(evReview);
+   }
+}
+
+/**
+ * 主任強制推進論文（行政裁量，略過當前 Stage 或 Gate）
+ * @param {edu.thesis.review.AdvanceThesis} tx
+ * @transaction
+ */
+async function advanceThesis(tx) {
+const thesis = tx.thesis;
+const participant = getCurrentParticipant();
+
+// === 身份驗證 ===
+if (!participant) {
+throw new Error('找不到當前參與者。');
+   }
+if (participant.getFullyQualifiedType() !== 'edu.thesis.review.Director') {
+throw new Error('只有 Director（主任/行政端）可以執行 AdvanceThesis 強制推進。');
+   }
+if (thesis.isCompleted) {
+throw new Error('論文已完成，無需推進。');
+   }
+
+const factory = getFactory();
+
+if (thesis.isGatePhase) {
+// 目前在 Gate 審查 → 強制通過，推進到下一 Stage
+thesis.isGatePhase = false;
+thesis.currentStage = thesis.currentGate + 1;
+thesis.currentGate = 0;
+   } else {
+// 目前在 Stage 工作 → 強制進入下一個 Gate（或完成）
+if (thesis.currentStage >= 6) {
+thesis.isCompleted = true;
+
+const thesisRegistry = await getAssetRegistry('edu.thesis.review.Thesis');
+await thesisRegistry.update(thesis);
+
+const evDone = factory.newEvent('edu.thesis.review', 'ThesisCompleted');
+evDone.thesisId = thesis.thesisId;
+emit(evDone);
+           return;
+} else {
+thesis.isGatePhase = true;
+thesis.currentGate = thesis.currentStage;
+}
+   }
+
+const thesisRegistry = await getAssetRegistry('edu.thesis.review.Thesis');
+await thesisRegistry.update(thesis);
+
+const ev = factory.newEvent('edu.thesis.review', 'ThesisAdvanced');
+ev.thesisId   = thesis.thesisId;
+ev.newStage   = thesis.currentStage;
+ev.isGatePhase = thesis.isGatePhase;
+emit(ev);
+}
