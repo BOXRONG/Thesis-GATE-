@@ -1,0 +1,152 @@
+CTO
+/**
+ * 論文審查區塊鏈 — CTO 模型定義
+ * namespace: edu.thesis.review
+ *
+ * 角色對應：
+ *Student    ← Developer（論文撰寫者）
+ *Checker    ← GateKeeper Gate 1（格式抄襲檢查員）
+ *Professor  ← GateKeeper Gate 2、4（指導教授 / 口試委員）
+ *Director   ← ProjectManager（主任/行政端）
+ */
+
+namespace edu.thesis.review
+
+// ========== 參與者 ==========
+
+/**
+ * 學生：論文撰寫者
+ * 負責 Stage 工作（撰寫報告）與送審（SubmitToGate）
+ */
+participant Student identified by studentId {
+ o String studentId       // 學號，例如 S11001
+ o String name            // 姓名
+ o String department      // 所屬系所
+}
+
+/**
+ * 格式抄襲檢查員
+ * 只負責 Gate 1 審查（抄襲率與格式規範）
+ */
+participant Checker identified by checkerId {
+ o String checkerId       // 編號，例如 C001
+ o String name
+}
+
+/**
+ * 指導教授
+ * 負責 Gate 2（口試核准）與 Gate 4（口試委員決議）
+ */
+participant Professor identified by professorId {
+ o String professorId     // 例如 P001
+ o String name
+ o String title           // 職稱，例如 副教授
+}
+
+/**
+ * 主任/行政端
+ * 負責 Gate 3（口試排程）、Gate 5（最終核可）、強制推進
+ */
+participant Director identified by directorId {
+ o String directorId      // 例如 D001
+ o String name
+}
+
+// ========== 資產 ==========
+
+/**
+ * 論文資產：追蹤一份論文從撰寫到完成的全流程
+ *
+ * Stage 對應：
+ *Stage 1 → 論文撰寫初稿
+ *Stage 2 → 指導教授審閱與修改
+ *Stage 3 → 行政送審（文件確認）
+ *Stage 4 → 口試進行
+ *Stage 5 → 口試後修改
+ *Stage 6 → 最終繳交定稿
+ *
+ * Gate 對應：
+ *  Gate 1 → 抄襲/格式審查（Checker）
+ *  Gate 2 → 教授核准口試（Professor）
+ *  Gate 3 → 行政排程核准（Director）
+ *  Gate 4 → 口試委員決議（Professor）
+ *  Gate 5 → 最終核可（Director）
+ */
+asset Thesis identified by thesisId {
+ o String thesisId                             // 論文唯一編號，例如 "T2026-001"
+ o String thesisTitle                          // 論文題目
+ o Integer currentStage// 目前所在 Stage（1~6）
+ o Boolean isGatePhase// true = 正在 Gate 審查；false = 正在 Stage 工作
+ o Integer currentGate// 若 isGatePhase=true，表示第幾關 Gate（1~5）；否則為 0
+ o String[] stageReports// 長度 6，各 Stage 的進度報告
+ o String[] gateComments// 長度 5，各 Gate 的審查意見
+ o Boolean[] gateApprovals                      // 長度 5，各 Gate 是否通過
+ o Boolean  isCompleted default = false        // 論文是否完成全流程
+--> Student  student                          // 此論文的學生
+--> Professor advisor                          // 此論文的指導教授
+--> Director director                         // 負責管理的主任/行政端
+}
+
+// ========== 交易 ==========
+
+/**
+ * 學生更新當前 Stage 的論文進度報告
+ */
+transaction UpdateThesisWork {
+--> Thesis thesis         // 目標論文
+ o String report           // 進度報告內容
+}
+
+/**
+ * 學生完成 Stage 工作後送出，進入對應 Gate 審查
+ * Stage 1 完成 → Gate 1；Stage 6 完成 →直接標記完成
+ */
+transaction SubmitToGate {
+--> Thesis thesis
+}
+
+/**
+ * 審查者（Checker / Professor / Director）對當前 Gate 投票
+ */
+transaction ReviewGate {
+--> Thesis thesis
+ o Boolean approved        // true=通過，false=不通過
+ o String comments        // 審查意見
+}
+
+/**
+ * 主任強制推進論文（緊急情況或行政裁量）
+ * 略過當前 Stage 或 Gate，直接進入下一階段
+ */
+transaction AdvanceThesis {
+--> Thesis thesis
+}
+
+// ========== 事件 ==========
+
+/** Stage 報告被更新時廣播 */
+event StageUpdated {
+ o String thesisId
+ o Integer stage
+ o String updatedBy       // studentId
+}
+
+/** Gate 審查完成時廣播 */
+event GateReviewed {
+ o String thesisId
+ o Integer gate
+ o Boolean approved
+ o String reviewedBy      // checkerId / professorId / directorId
+}
+
+/** 論文推進到下一階段時廣播 */
+event ThesisAdvanced {
+ o String thesisId
+ o Integer newStage
+ o Boolean isGatePhase
+}
+
+/** 論文全程完成時廣播 */
+event ThesisCompleted {
+ o String thesisId
+}
