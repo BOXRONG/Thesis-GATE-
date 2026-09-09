@@ -16,6 +16,8 @@
 
 透過智慧合約與鏈上存取控制（ACL），系統在底層強制規範參與角色的權限邊界，確保審查歷程具備**不可篡改性**、**時間公證性**與**全程留痕**，建立透明且具公信力的學術審查工作流。
 
+<img width="2516" height="1417" alt="image" src="https://github.com/user-attachments/assets/d31fea33-c714-460a-844c-e3c1e028cffa" />
+
 ---
 
 ## 🛠️ 技術堆疊 (Tech Stack)
@@ -68,3 +70,25 @@
 
 ### 系統架構圖 (UML Data Model)
 > 系統資產（Thesis）、參與者（Participants）與交易（Transactions）關聯架構：
+> <img width="3106" height="1571" alt="architecture" src="https://github.com/user-attachments/assets/081605d2-a5ce-43f8-a64d-44798d97031b" />
+
+### 系統操作展示 (Demo)
+
+* **Stage 3 行政送審交易測試：**
+  <!-- 可在此處貼上終端機或 Web 介面的運行截圖 -->
+  <!-- ![Demo Screenshot](./docs/demo-stage3.png) -->
+
+* **完整實作流程展示影片：**
+  👉[https://www.youtube.com/watch?v=HeX2dzU-xbM］
+
+---
+
+## 📂 專案目錄結構 (Repository Structure)
+
+```text
+├── models/
+│   └── edu.thesis.review.cto    # 區塊鏈資料模型 (Asset, Participant, Transaction, Event)
+├── lib/
+│   └── logic.js                 # 智慧合約業務邏輯 (狀態機流轉、權限檢驗)
+├── permissions.acl              # 鏈上存取控制規則 (ACL 白名單與防護)
+└── README.md                    # 專案說明文件
