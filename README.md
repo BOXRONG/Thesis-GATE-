@@ -17,6 +17,10 @@
 透過智慧合約與鏈上存取控制（ACL），系統在底層強制規範參與角色的權限邊界，確保審查歷程具備**不可篡改性**、**時間公證性**與**全程留痕**，建立透明且具公信力的學術審查工作流。
 
 <img width="2516" height="1417" alt="image" src="https://github.com/user-attachments/assets/d31fea33-c714-460a-844c-e3c1e028cffa" />
+<img width="2518" height="1270" alt="image" src="https://github.com/user-attachments/assets/b98e02ec-a4f0-4958-9a9f-afa80a1c2d12" />
+<img width="2525" height="1412" alt="螢幕擷取畫面 2026-09-10 014958" src="https://github.com/user-attachments/assets/5f915421-c578-4051-9dc3-bd374ebedc3e" />
+
+
 
 ---
 
