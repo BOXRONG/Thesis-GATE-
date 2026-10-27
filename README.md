@@ -1,6 +1,6 @@
 # Thesis-GATE 論文檢查送件系統
 
-> 基於 Hyperledger 聯盟鏈與 Stage-Gate 門徑管理模型之去中心化学術審查與送件系統
+> 基於 Hyperledger 聯盟鏈與 Stage-Gate 門徑管理模型之去中心化学術審查與送件系統（v2.0版本已經推出，可在於主頁面選擇並觀看)
 
 [![Hyperledger Composer](https://img.shields.io/badge/Blockchain-Hyperledger%20Composer-blue.svg)](https://hyperledger.github.io/)
 [![Smart Contract](https://img.shields.io/badge/Smart%20Contract-JavaScript%20(ES6+)-yellow.svg)]()
